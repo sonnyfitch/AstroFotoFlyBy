@@ -5,8 +5,8 @@ from astropy.io import fits
 
 def load_and_normalize_image(file_path):
     """Intelligently processes standard consumer formats or memory-mapped FITS layers."""
-    # FIXED: Extract the raw string path if it was passed down as a glob list wrapper
-    if isinstance(file_path, list):
+    # FIXED: Extract the raw string path if passed down as a list or a tuple wrapper
+    if isinstance(file_path, (list, tuple)):
         if len(file_path) > 0:
             file_path = file_path[0]
         else:
@@ -70,23 +70,29 @@ def load_and_normalize_image(file_path):
 def render_spaceflight(selected_pair):
     """Executes frame transformation layouts and exports an MP4 movie container."""
     print(f"\n[Step 3] Loading image assets into background processing buffers...")
-    bg_img = load_and_normalize_image(selected_pair['starless'])
-    stars_img = load_and_normalize_image(selected_pair['starmask'])
+    
+    # FIXED: Force the target selection items to unpack clean elements if they contain sequences
+    starless_src = selected_pair['starless']
+    starmask_src = selected_pair['starmask']
+    if isinstance(starless_src, (list, tuple)) and len(starless_src) > 0: starless_src = starless_src[0]
+    if isinstance(starmask_src, (list, tuple)) and len(starmask_src) > 0: starmask_src = starmask_src[0]
+
+    bg_img = load_and_normalize_image(starless_src)
+    stars_img = load_and_normalize_image(starmask_src)
 
     if bg_img is None or stars_img is None:
         print("❌ Error: Could not parse target data files.")
         return
 
     if bg_img.shape != stars_img.shape:
-        stars_img = cv2.resize(stars_img, (bg_img.shape, bg_img.shape))
+        stars_img = cv2.resize(stars_img, (bg_img.shape[1], bg_img.shape[0]))
 
     height, width, _ = bg_img.shape
     fps = 30
     total_frames = fps * 10
     
-    # FIXED: Extract output path string safely from list structure if needed
     out_dir = selected_pair['output_dir']
-    if isinstance(out_dir, list):
+    if isinstance(out_dir, (list, tuple)):
         out_dir = out_dir[0]
         
     output_path = os.path.join(out_dir, f"spaceflight_{selected_pair['folder']}.mp4")
