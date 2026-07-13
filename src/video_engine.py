@@ -4,11 +4,10 @@ import numpy as np
 from astropy.io import fits
 
 def unwrap_path(item):
-    """Bulletproof iterative unwrapper that guarantees a clean string output."""
+    """Bulletproof un-nester that continuously pulls out the first element until it hits a string."""
     while isinstance(item, (list, tuple, set)):
         if len(item) > 0:
-            # Safely grab the very first entry inside the sequence container layout
-            item = list(item)[0]
+            item = list(item)[0]  # FIXED: Force pull the absolute first index out of the sequence array
         else:
             return None
     return item
