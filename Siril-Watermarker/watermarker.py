@@ -10,7 +10,7 @@ v1.5.0 (Fix)      - Rewrote using siril.cmd and direct Tkinter manual fallback f
 v1.6.0 (Update)   - Streamlined code execution loop directly to the working manual selector.
 v1.7.0 (Update)   - Replaced single prompt with an expanded custom multi-field configuration GUI.
 v1.8.0 (Update)   - Restructured into a clean 3-line layout including Location and Tech Specs.
-v1.9.3 (Stable)   - Integrated global wildcard (*.*) filters for both image and asset browse dialogs.
+v1.9.6 (Stable)   - Protected source assets by generating isolated alternative path targets dynamically.
 ================================================================================
 """
 
@@ -88,7 +88,7 @@ def get_watermark_configuration():
             cache = {}
 
     input_window = tk.Toplevel(root)
-    input_window.title("Configure Watermark Details (v1.9.3)")
+    input_window.title("Configure Watermark Details (v1.9.6)")
     input_window.geometry("540x240")
     input_window.attributes("-topmost", True)
     input_window.resizable(False, False)
@@ -154,16 +154,21 @@ def apply_watermark(image_path, config):
     img = cv2.imread(image_path)
     if img is None:
         print(f"Error: Could not load target image file asset at {image_path}")
-        return False
+        return False, None
         
     h, w, _ = img.shape
     margin_x = int(w * 0.02)
     margin_y = int(h * 0.03)
 
+    # Automatically generate a safe new file output path to preserve the original stack
+    base_dir, base_file = os.path.split(image_path)
+    filename, ext = os.path.splitext(base_file)
+    output_path = os.path.join(base_dir, f"{filename}.watermarked{ext}")
+
     if config.get("sig_file") and os.path.exists(config["sig_file"]):
         logo = cv2.imread(config["sig_file"], cv2.IMREAD_UNCHANGED)
         if logo is not None:
-            logo_h, logo_w = logo.shape[0], logo.shape[1]
+            logo_h, logo_w = logo.shape, logo.shape
             target_w = int(w * 0.15)
             target_h = int(logo_h * (target_w / logo_w))
             logo = cv2.resize(logo, (target_w, target_h), interpolation=cv2.INTER_AREA)
@@ -173,16 +178,16 @@ def apply_watermark(image_path, config):
             x1 = w - target_w - margin_x
             x2 = w - margin_x
             
-            if len(logo.shape) > 2 and logo.shape[2] == 4:
+            if len(logo.shape) > 2 and logo.shape == 4:
                 alpha = logo[:, :, 3] / 255.0
                 for c in range(3):
                     img[y1:y2, x1:x2, c] = (1.0 - alpha) * img[y1:y2, x1:x2, c] + alpha * logo[:, :, c]
             else:
                 img[y1:y2, x1:x2] = logo[:, :, :3]
             
-            cv2.imwrite(image_path, img)
-            print(f"Graphic logo signature watermarked onto image asset: {image_path}")
-            return True
+            cv2.imwrite(output_path, img)
+            print(f"Logo watermarked onto alternative output file target: {output_path}")
+            return True, output_path
 
     font_scale = max(0.5, w / 3200.0)
     thickness = max(1, int(w / 1600))
@@ -194,7 +199,7 @@ def apply_watermark(image_path, config):
     current_y = h - margin_y
     for text in reversed(text_lines):
         text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
-        text_w, text_h = text_size[0], text_size[1]
+        text_w, text_h = text_size, text_size
         line_spacing = int(text_h * 1.8)
         
         pos_x = w - text_w - margin_x
@@ -204,9 +209,9 @@ def apply_watermark(image_path, config):
         
         current_y -= line_spacing
 
-    cv2.imwrite(image_path, img)
-    print(f"Stitched multi-line text parameters to destination asset: {image_path}")
-    return True
+    cv2.imwrite(output_path, img)
+    print(f"Stitched multi-line text parameters to alternative output target: {output_path}")
+    return True, output_path
 
 def main():
     print("Initializing Siril Automated Watermarker Engine...")
@@ -223,7 +228,11 @@ def main():
     )
     
     if target_file:
-        apply_watermark(target_file, config)
+        success, final_output = apply_watermark(target_file, config)
+        
+        # Force Siril command canvas to reload the alternative watermarked file layout
+        if success and final_output:
+            print(f"siril load \"{final_output}\"")
 
 if __name__ == "__main__":
     main()
