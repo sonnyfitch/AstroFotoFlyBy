@@ -168,21 +168,17 @@ def apply_watermark(image_path, config):
 
 def main():
     print("Initializing Siril Automated Watermarker Engine...")
-    signature = get_watermark_identity()
-    
-    # Setup window for interactive target image picking
+    config = get_watermark_configuration()
+    if not config:
+        print("Run execution halted.")
+        return
+        
     root = tk.Tk()
     root.withdraw()
-    
     target_file = filedialog.askopenfilename(
-        title="Select Astrophotography Stacked Output Image",
+        title="Select Astrophotography Target Image Frame Asset",
         filetypes=[("Image Files", "*.tif *.tiff *.jpg *.jpeg *.png")]
     )
     
     if target_file:
-        apply_watermark(target_file, signature)
-    else:
-        print("Processing run abandoned. No image asset specified.")
-
-if __name__ == "__main__":
-    main()
+        apply_watermark(target_file, config)
